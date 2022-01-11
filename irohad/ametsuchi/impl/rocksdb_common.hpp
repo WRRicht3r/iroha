@@ -514,8 +514,8 @@ namespace iroha::ametsuchi {
       table_options.block_size = 32 * 1024;
       // table_options.pin_l0_filter_and_index_blocks_in_cache = true;
       table_options.cache_index_and_filter_blocks = true;
-      /*table_options.filter_policy.reset(
-          rocksdb::NewBloomFilterPolicy(10, false));*/
+      table_options.filter_policy.reset(
+          rocksdb::NewBloomFilterPolicy(10, false));
 
       rocksdb::Options options;
       options.create_if_missing = true;
@@ -766,7 +766,7 @@ namespace iroha::ametsuchi {
       transaction().reset();
 
       assert(status.ok());
-      if (context()->number_modifications_ >= 100'000ull) {
+      if (context()->number_modifications_ >= 10'000'000ull) {
         reinit();
         context()->number_modifications_ = 0ull;
       }
