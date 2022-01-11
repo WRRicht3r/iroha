@@ -430,7 +430,7 @@ namespace iroha::ametsuchi {
     explicit RocksDBContext(
         std::shared_ptr<RocksDBPort> dbp,
         std::shared_ptr<DatabaseCache<std::string>> cache = nullptr)
-        : cache_(std::move(cache)), db_port(std::move(dbp)) {
+        : cache_(std::move(cache)), db_port(std::move(dbp)), number_modifications_(0ull) {
       assert(db_port);
     }
 
@@ -455,6 +455,8 @@ namespace iroha::ametsuchi {
 
     /// Mutex to guard multithreaded access to this context
     std::recursive_mutex this_context_cs;
+
+    uint64_t number_modifications_;
   };
 
   enum DbErrorCode {
@@ -511,8 +513,8 @@ namespace iroha::ametsuchi {
       table_options.block_size = 32 * 1024;
       // table_options.pin_l0_filter_and_index_blocks_in_cache = true;
       table_options.cache_index_and_filter_blocks = true;
-      table_options.filter_policy.reset(
-          rocksdb::NewBloomFilterPolicy(10, false));
+      /*table_options.filter_policy.reset(
+          rocksdb::NewBloomFilterPolicy(10, false));*/
 
       rocksdb::Options options;
       options.create_if_missing = true;
@@ -532,6 +534,12 @@ namespace iroha::ametsuchi {
 
       transaction_db_.reset(transaction_db);
       return {};
+    }
+
+    void flushDB() {
+      assert(transaction_db_);
+      assert(transaction_db_->Flush(rocksdb::FlushOptions()).ok());
+      assert(transaction_db_->FlushWAL(true).ok());
     }
 
     template <typename LoggerT>
@@ -645,6 +653,10 @@ namespace iroha::ametsuchi {
       return tx_context_->key_buffer;
     }
 
+    auto &context() {
+      return tx_context_;
+    }
+
    private:
     auto &transaction() {
       if (!tx_context_->transaction)
@@ -739,6 +751,10 @@ namespace iroha::ametsuchi {
           "rocksdb.block-cache-capacity");
     }
 
+    auto flush() {
+      return tx_context_->db_port->flushDB();
+    }
+
     /// Makes commit to DB
     auto commit() {
       rocksdb::Status status;
@@ -747,6 +763,12 @@ namespace iroha::ametsuchi {
 
       commitCache();
       transaction().reset();
+
+      assert(status.ok());
+      if (context()->number_modifications_ >= 10'000ull) {
+        flush();
+        context()->number_modifications_ = 0ull;
+      }
       return status;
     }
 
@@ -852,6 +874,7 @@ namespace iroha::ametsuchi {
       if (status.ok())
         storeInCache(slice.ToStringView());
 
+      context()->number_modifications_++;
       return status;
     }
 
@@ -865,6 +888,7 @@ namespace iroha::ametsuchi {
       if (auto c = cache(); c && c->isCacheable(slice.ToStringView()))
         c->erase(slice.ToStringView());
 
+      context()->number_modifications_++;
       return transaction()->Delete(slice);
     }
 
