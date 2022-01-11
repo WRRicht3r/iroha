@@ -231,7 +231,7 @@ namespace iroha::ametsuchi {
       /// it is important to continue from last commit point to save time.
       do {
         auto commit_height =
-            std::min(wsv_ledger_height + 1000, last_block_in_storage);
+            std::min(wsv_ledger_height + 10, last_block_in_storage);
         IROHA_EXPECTED_TRY_GET_VALUE(
             mutable_storage,
             storage.createMutableStorage(command_executor,

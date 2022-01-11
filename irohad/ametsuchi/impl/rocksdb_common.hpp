@@ -767,7 +767,7 @@ namespace iroha::ametsuchi {
 
       assert(status.ok());
       if (context()->number_modifications_ >= 10'000'000ull) {
-        reinit();
+        //reinit();
         context()->number_modifications_ = 0ull;
       }
       return status;
