@@ -506,6 +506,7 @@ namespace iroha::ametsuchi {
    private:
     expected::Result<void, DbError> reinitDB() {
       assert(db_name_);
+      transaction_db_.reset();
 
       rocksdb::BlockBasedTableOptions table_options;
       table_options.block_cache =
@@ -751,22 +752,22 @@ namespace iroha::ametsuchi {
           "rocksdb.block-cache-capacity");
     }
 
-    auto flush() {
-      return tx_context_->db_port->flushDB();
+    auto reinit() {
+      return tx_context_->db_port->reinitDB();
     }
 
     /// Makes commit to DB
     auto commit() {
       rocksdb::Status status;
       if (isTransaction())
-        status = transaction()->Commit();
+        while ((status = transaction()->Commit()).IsTryAgain());
 
       commitCache();
       transaction().reset();
 
       assert(status.ok());
-      if (context()->number_modifications_ >= 10'000ull) {
-        flush();
+      if (context()->number_modifications_ >= 100'000ull) {
+        reinit();
         context()->number_modifications_ = 0ull;
       }
       return status;
